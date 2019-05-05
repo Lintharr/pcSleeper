@@ -1,24 +1,24 @@
-﻿using System;
-using System.Drawing;
-using System.Windows.Forms;
-using System.Runtime.InteropServices;
-using System.Timers;
-using Microsoft.Win32;
-using System.IO;
-using System.Security.Principal;
-using System.Linq;
-using Microsoft.Xna.Framework.Input;
+﻿using Microsoft.Win32;
 using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Input;
+using System;
+using System.Drawing;
+using System.IO;
+using System.Linq;
+using System.Runtime.InteropServices;
+using System.Security.Principal;
+using System.Timers;
+using System.Windows.Forms;
 
 namespace PCSleeper
 {
-    static class Program
+    internal static class Program
     {
         /// <summary>
         /// The main entry point for the application.
         /// </summary>
         [STAThread]
-        static void Main()
+        private static void Main()
         {
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
@@ -26,14 +26,55 @@ namespace PCSleeper
         }
     }
 
-    internal class SleeperContext : ApplicationContext
+    internal class SleeperContext : ApplicationContext, IDisposable
     {
-        private NotifyIcon _trayIcon;
-        private TimeSpan _nightStartHour = new TimeSpan(0, 0, 0);
-        private TimeSpan _nightEndHour = new TimeSpan(7, 0, 0);
-        private uint CheckInterval = TimeHelper.Minutes(15);
-        private uint IdleTimeLimit = TimeHelper.Minutes(30);
+        #region Fields & Properties
+
+        /// <summary>
+        /// Timer which runs all the time this app is alive and checks every <see cref="CheckIntervalOfSleepChecker"/> whether it is night time (as according to <see cref="NightStartHour"/> and <see cref="NightEndHour"/>) and whether the PC has been idle for <see cref="NightIdleTimeLimit"/>
+        /// and if so, makes the computer sleep. Won't make it sleep if XInput gamepad is connected.
+        /// </summary>
+        private System.Timers.Timer SleepChecker { get; set; } = null;
+
+        /// <summary>
+        /// Timer which is created whenever system wakes up, lives for a maximum of <see cref="WakeUpCheckerMaxLifespan"/> and checks every <see cref="CheckIntervalOfWakeUpChecker"/> whether the PC has been idle for <see cref="WakeUpIdleTimeLimit"/>. If the condtions are met, it makes the PC go back to sleep.
+        /// An anti-cat measure.
+        /// </summary>
+        private System.Timers.Timer WakeUpChecker { get; set; } = null;
+
+        /// <summary>
+        /// This app features a windows tray icon to allow for simpler closing/killing of the app.
+        /// </summary>
+        private NotifyIcon TrayIcon;
+
+        /// <summary>
+        /// Time property which decides when the night - and the possiblity to make the PC go to sleep - starts.
+        /// </summary>
+        private TimeSpan NightStartHour { get; } = new TimeSpan(0, 0, 0);
+
+        /// <summary>
+        /// Time property which decides when the night - and the possiblity to make the PC go to sleep - ends.
+        /// </summary>
+        private TimeSpan NightEndHour { get; } = new TimeSpan(7, 0, 0);
+
+        /// <summary>
+        /// Property holding the exact time when <see cref="WakeUpChecker"/> has been created.
+        /// </summary>
+        private DateTime? WakeUpCheckerStartTime { get; set; } = null;
+
+        private uint CheckIntervalOfSleepChecker = TimeHelper.Minutes(15);
+        private uint NightIdleTimeLimit = TimeHelper.Minutes(30);
+
+        private uint CheckIntervalOfWakeUpChecker = TimeHelper.Minutes(1);
+        private uint WakeUpIdleTimeLimit = TimeHelper.Minutes(2);
+        private TimeSpan WakeUpCheckerMaxLifespan = new TimeSpan(0, 15, 0);
+
+        /// <summary>
+        /// This app may install itself onto the computer if ran with admin privileges and the user gives consent. It does so by registering a key in Windows Registry (regedit) and installing the executable in Program Files. It may then start whenever system is powered on.
+        /// </summary>
         private string _appRegistryKeyName = "pcSleeper";
+
+        #endregion Fields & Properties
 
         internal SleeperContext()
         {
@@ -45,24 +86,12 @@ namespace PCSleeper
             }
 
             TryToInstallThisApp();
-
-            System.Timers.Timer sleepChecker = new System.Timers.Timer();
-            sleepChecker.Elapsed += new ElapsedEventHandler(OnTimedEvent);
-            sleepChecker.Interval = CheckInterval;
-            sleepChecker.Enabled = true;
-
-            //Initialize Tray Icon
-            _trayIcon = new NotifyIcon()
-            {
-                Icon = new Icon(@"D:\Kyass\coding stuff\MyProjects\PCSleeper\PCSleeper\sleepIco.ico"),
-                ContextMenu = new ContextMenu(new MenuItem[]
-                {
-                    new MenuItem("Exit/Kill", Exit)
-                }),
-                Visible = true,
-                Text = "PcSleeper"
-            };
+            InitializeTrayIcon();
+            CreateSleeperChecker();
+            AttachToWindowsWakeUpEvent(); //https://stackoverflow.com/questions/18206183/event-to-detect-system-wake-up-from-sleep-in-c-sharp
         }
+
+        #region Launch app stuff
 
         private void TryToInstallThisApp()
         {
@@ -86,19 +115,51 @@ namespace PCSleeper
             }
         }
 
-        private void Exit(object sender, EventArgs e)
+        internal static bool IsRunAsAdministrator()
+        {
+            return (new WindowsPrincipal(WindowsIdentity.GetCurrent()))
+                      .IsInRole(WindowsBuiltInRole.Administrator);
+        }
+
+        private void InitializeTrayIcon()
+        {
+            TrayIcon = new NotifyIcon()
+            {
+                Icon = new Icon(@"D:\Kyass\coding stuff\MyProjects\PCSleeper\PCSleeper\sleepIco.ico"),
+                ContextMenu = new ContextMenu(new MenuItem[]
+                {
+                    new MenuItem("Exit/Kill", AppExit),
+                }),
+                Visible = true,
+                Text = "PcSleeper"
+            };
+        }
+
+        private void AppExit(object sender, EventArgs e)
         {
             // Hide tray icon, otherwise it will remain shown until user mouses over it
-            _trayIcon.Visible = false;
+            TrayIcon.Visible = false;
 
             Application.Exit();
         }
 
-        private void OnTimedEvent(object source, ElapsedEventArgs e)
+        #endregion Launch app stuff
+
+        #region SleeperChecker
+
+        private void CreateSleeperChecker()
+        {
+            SleepChecker = new System.Timers.Timer();
+            SleepChecker.Elapsed += new ElapsedEventHandler(OnTimedSleepCheckerEvent);
+            SleepChecker.Interval = CheckIntervalOfSleepChecker;
+            SleepChecker.Enabled = true;
+        }
+
+        private void OnTimedSleepCheckerEvent(object source, ElapsedEventArgs e)
         {
             //App has to target x86 for this gamepad checking thing to work, otherwise compiler throws runtime errors.
             GamePadState xboxControllerCurrentState = GamePad.GetState(PlayerIndex.One); // Get the current gamepad state. // Process input only if controller is connected.
-            if (IsItNightTime() && !xboxControllerCurrentState.IsConnected && Win32_IdleHander.GetIdleTime() > IdleTimeLimit)
+            if (IsItNightTime() && !xboxControllerCurrentState.IsConnected && Win32_IdleHander.GetIdleTime() > NightIdleTimeLimit)
             {
                 MakePcSleep();
             }
@@ -107,8 +168,50 @@ namespace PCSleeper
         private bool IsItNightTime()
         {
             TimeSpan currentTime = DateTime.Now.TimeOfDay;
-            return (currentTime > _nightStartHour) && (currentTime < _nightEndHour);
+            return (currentTime > NightStartHour) && (currentTime < NightEndHour);
         }
+
+        #endregion SleeperChecker
+
+        #region WakeUpChecker
+
+        private void AttachToWindowsWakeUpEvent()
+        {
+            SystemEvents.PowerModeChanged += OnPowerChange;
+        }
+
+        private void OnPowerChange(object s, PowerModeChangedEventArgs e)
+        {
+            if (e.Mode == PowerModes.Resume)
+            {
+                CreateWakeUpChecker();
+            }
+        }
+
+        private void CreateWakeUpChecker()
+        {
+            WakeUpChecker = new System.Timers.Timer();
+            WakeUpChecker.Elapsed += new ElapsedEventHandler(OnTimedWakeUpEvent);
+            WakeUpChecker.Interval = CheckIntervalOfWakeUpChecker;
+            WakeUpCheckerStartTime = DateTime.UtcNow;
+            WakeUpChecker.Enabled = true;
+        }
+
+        private void OnTimedWakeUpEvent(object source, ElapsedEventArgs e)
+        {
+            if (Win32_IdleHander.GetIdleTime() > WakeUpIdleTimeLimit)
+            {
+                DisposeOfWakeUpChecker();
+                MakePcSleep();
+            }
+            else if (DateTime.UtcNow - WakeUpCheckerStartTime > WakeUpCheckerMaxLifespan)
+            {
+                WakeUpCheckerStartTime = null;
+                DisposeOfWakeUpChecker();
+            }
+        }
+
+        #endregion WakeUpChecker
 
         private void MakePcSleep()
         {
@@ -118,31 +221,36 @@ namespace PCSleeper
                 MessageBox.Show("Could not suspend the system.");
         }
 
-        internal static bool IsRunAsAdministrator()
+        public new void Dispose()
         {
-            return (new WindowsPrincipal(WindowsIdentity.GetCurrent()))
-                      .IsInRole(WindowsBuiltInRole.Administrator);
+            SystemEvents.PowerModeChanged -= OnPowerChange;
+            SleepChecker.Elapsed -= new ElapsedEventHandler(OnTimedSleepCheckerEvent);
+            SleepChecker.Close();
+            SleepChecker = null;
+            DisposeOfWakeUpChecker();
+            TrayIcon.Visible = false;
+            base.Dispose();
+        }
+
+        private void DisposeOfWakeUpChecker()
+        {
+            if (WakeUpChecker != null)
+            {
+                WakeUpChecker.Elapsed -= new ElapsedEventHandler(OnTimedWakeUpEvent);
+                WakeUpChecker.Close();
+                WakeUpChecker = null;
+            }
         }
     }
 
-    internal static class TimeHelper
-    {
-        internal static uint Seconds(uint howManySeconds)
-        {
-            return howManySeconds * 1000;
-        }
-
-        internal static uint Minutes(uint howManyMinutes)
-        {
-            return howManyMinutes * 60000;
-        }
-    }
+    #region Win32 idle handling stuff
 
     internal struct LastInputInfo
     {
         internal uint cbSize;
         internal uint dwTime;
     }
+
     internal class Win32_IdleHander
     {
         [DllImport("User32.dll")]
@@ -177,4 +285,6 @@ namespace PCSleeper
             return lastUserInput.dwTime;
         }
     }
+
+    #endregion Win32 idle handling stuff
 }
