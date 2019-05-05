@@ -43,11 +43,6 @@ namespace PCSleeper
         private System.Timers.Timer WakeUpChecker { get; set; } = null;
 
         /// <summary>
-        /// This app features a windows tray icon to allow for simpler closing/killing of the app.
-        /// </summary>
-        private NotifyIcon TrayIcon;
-
-        /// <summary>
         /// Time property which decides when the night - and the possiblity to make the PC go to sleep - starts.
         /// </summary>
         private TimeSpan NightStartHour { get; } = new TimeSpan(0, 0, 0);
@@ -70,6 +65,11 @@ namespace PCSleeper
         private TimeSpan WakeUpCheckerMaxLifespan = new TimeSpan(0, 15, 0);
 
         /// <summary>
+        /// This app features a windows tray icon to allow for simpler closing/killing of the app.
+        /// </summary>
+        private NotifyIcon TrayIcon;
+
+        /// <summary>
         /// This app may install itself onto the computer if ran with admin privileges and the user gives consent. It does so by registering a key in Windows Registry (regedit) and installing the executable in Program Files. It may then start whenever system is powered on.
         /// </summary>
         private string _appRegistryKeyName = "pcSleeper";
@@ -78,6 +78,7 @@ namespace PCSleeper
 
         internal SleeperContext()
         {
+            Logger.LogInfo("App starting.");
             if (System.Diagnostics.Process.GetProcessesByName(System.IO.Path.GetFileNameWithoutExtension(System.Reflection.Assembly.GetEntryAssembly().Location)).Count() > 1)
             {
                 MessageBox.Show("PcSleeper is already running!");
@@ -128,11 +129,20 @@ namespace PCSleeper
                 Icon = new Icon(@"D:\Kyass\coding stuff\MyProjects\PCSleeper\PCSleeper\sleepIco.ico"),
                 ContextMenu = new ContextMenu(new MenuItem[]
                 {
+                    new MenuItem("Log info", ToggleLogger),
                     new MenuItem("Exit/Kill", AppExit),
                 }),
                 Visible = true,
                 Text = "PcSleeper"
             };
+            TrayIcon.ContextMenu.MenuItems[0].Checked = ConfigManager.EnableLogging;
+        }
+
+        private void ToggleLogger(object sender, EventArgs e)
+        {
+            MenuItem menuItem = sender as MenuItem;
+            ConfigManager.EnableLogging = !ConfigManager.EnableLogging;
+            menuItem.Checked = ConfigManager.EnableLogging;
         }
 
         private void AppExit(object sender, EventArgs e)
@@ -149,6 +159,7 @@ namespace PCSleeper
 
         private void CreateSleeperChecker()
         {
+            Logger.LogInfo($@"Creating {nameof(SleepChecker)}.");
             SleepChecker = new System.Timers.Timer();
             SleepChecker.Elapsed += new ElapsedEventHandler(OnTimedSleepCheckerEvent);
             SleepChecker.Interval = CheckIntervalOfSleepChecker;
@@ -159,7 +170,9 @@ namespace PCSleeper
         {
             //App has to target x86 for this gamepad checking thing to work, otherwise compiler throws runtime errors.
             GamePadState xboxControllerCurrentState = GamePad.GetState(PlayerIndex.One); // Get the current gamepad state. // Process input only if controller is connected.
-            if (IsItNightTime() && !xboxControllerCurrentState.IsConnected && Win32_IdleHander.GetIdleTime() > NightIdleTimeLimit)
+            var idleTime = Win32_IdleHander.GetIdleTime();
+            Logger.LogInfo($@"{nameof(SleepChecker)} - PC idle time: {TimeHelper.ConvertTicksToTime(idleTime)}. Is game pad connected: {xboxControllerCurrentState.IsConnected}.");
+            if (IsItNightTime() && !xboxControllerCurrentState.IsConnected && idleTime > NightIdleTimeLimit)
             {
                 MakePcSleep();
             }
@@ -177,6 +190,7 @@ namespace PCSleeper
 
         private void AttachToWindowsWakeUpEvent()
         {
+            Logger.LogInfo("Attaching to Windows wake up event.");
             SystemEvents.PowerModeChanged += OnPowerChange;
         }
 
@@ -184,12 +198,14 @@ namespace PCSleeper
         {
             if (e.Mode == PowerModes.Resume)
             {
+                Logger.LogInfo("System woke up!");
                 CreateWakeUpChecker();
             }
         }
 
         private void CreateWakeUpChecker()
         {
+            Logger.LogInfo($@"Creating {nameof(WakeUpChecker)}.");
             WakeUpChecker = new System.Timers.Timer();
             WakeUpChecker.Elapsed += new ElapsedEventHandler(OnTimedWakeUpEvent);
             WakeUpChecker.Interval = CheckIntervalOfWakeUpChecker;
@@ -199,7 +215,9 @@ namespace PCSleeper
 
         private void OnTimedWakeUpEvent(object source, ElapsedEventArgs e)
         {
-            if (Win32_IdleHander.GetIdleTime() > WakeUpIdleTimeLimit)
+            var idleTime = Win32_IdleHander.GetIdleTime();
+            Logger.LogInfo($@"{nameof(WakeUpChecker)} - PC idle time: {TimeHelper.ConvertTicksToTime(idleTime)}.");
+            if (idleTime > WakeUpIdleTimeLimit)
             {
                 DisposeOfWakeUpChecker();
                 MakePcSleep();
@@ -215,6 +233,7 @@ namespace PCSleeper
 
         private void MakePcSleep()
         {
+            Logger.LogInfo("Sending PC to sleep.");
             bool retVal = Application.SetSuspendState(PowerState.Suspend, false, false);
 
             if (retVal == false)
@@ -223,6 +242,7 @@ namespace PCSleeper
 
         public new void Dispose()
         {
+            Logger.LogInfo("App closing.");
             SystemEvents.PowerModeChanged -= OnPowerChange;
             SleepChecker.Elapsed -= new ElapsedEventHandler(OnTimedSleepCheckerEvent);
             SleepChecker.Close();
