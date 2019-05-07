@@ -192,6 +192,11 @@ namespace PCSleeper
 
         private void CreateWakeUpChecker()
         {
+            if (WakeUpChecker != null)
+            {
+                Logger.LogWarning($@"{nameof(WakeUpChecker)} already exists!");
+                return;
+            }
             Logger.LogInfo($@"Creating {nameof(WakeUpChecker)}.");
             WakeUpChecker = new System.Timers.Timer();
             WakeUpChecker.Elapsed += new ElapsedEventHandler(OnTimedWakeUpEvent);
@@ -204,15 +209,15 @@ namespace PCSleeper
         {
             var idleTime = Win32_IdleHandler.GetIdleTime();
             Logger.LogInfo($@"{nameof(WakeUpChecker)} - PC idle time: {TimeHelper.ConvertTicksToTime(idleTime)}.");
-            if (idleTime > WakeUpIdleTimeLimit)
-            {
-                DisposeOfWakeUpChecker();
-                MakePcSleep();
-            }
-            else if (DateTime.UtcNow - WakeUpCheckerStartTime > WakeUpCheckerMaxLifespan)
+            if ((DateTime.UtcNow - WakeUpCheckerStartTime) > WakeUpCheckerMaxLifespan)
             {
                 WakeUpCheckerStartTime = null;
                 DisposeOfWakeUpChecker();
+            }
+
+            if (idleTime > WakeUpIdleTimeLimit)
+            {
+                MakePcSleep();
             }
         }
 
@@ -224,7 +229,10 @@ namespace PCSleeper
             bool retVal = Application.SetSuspendState(PowerState.Suspend, false, false);
 
             if (retVal == false)
+            {
+                Logger.LogError("Could not suspend the system.");
                 MessageBox.Show("Could not suspend the system.");
+            }
         }
 
         public new void Dispose()
@@ -246,6 +254,7 @@ namespace PCSleeper
                 WakeUpChecker.Elapsed -= new ElapsedEventHandler(OnTimedWakeUpEvent);
                 WakeUpChecker.Close();
                 WakeUpChecker = null;
+                Logger.LogInfo($@"Disposed of {nameof(WakeUpChecker)}.");
             }
         }
     }
