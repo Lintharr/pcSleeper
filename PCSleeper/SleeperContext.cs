@@ -159,7 +159,7 @@ namespace PCSleeper
             GamePadState xboxControllerCurrentState = GamePad.GetState(PlayerIndex.One); // Get the current gamepad state. // Process input only if controller is connected.
             var idleTime = Win32_IdleHandler.GetIdleTime();
             Logger.LogInfo($@"{nameof(SleepChecker)} - PC idle time: {TimeHelper.ConvertTicksToTime(idleTime)}. Is game pad connected: {xboxControllerCurrentState.IsConnected}.");
-            if (IsItNightTime() && !xboxControllerCurrentState.IsConnected && idleTime > NightIdleTimeLimit)
+            if (IsItNightTime() && !xboxControllerCurrentState.IsConnected && idleTime > GetTimeWithTolerance(NightIdleTimeLimit))
             {
                 MakePcSleep();
             }
@@ -215,13 +215,17 @@ namespace PCSleeper
                 DisposeOfWakeUpChecker();
             }
 
-            if (idleTime > WakeUpIdleTimeLimit)
+            if (idleTime > GetTimeWithTolerance(WakeUpIdleTimeLimit))
             {
                 MakePcSleep();
             }
         }
 
         #endregion WakeUpChecker
+
+        private uint GetTimeWithTolerance(uint timeLimit) => Convert.ToUInt32(timeLimit * (1 - GetTolerancePercent()));
+
+        private double GetTolerancePercent() => 10 / 100; //TODO: move 10 to config
 
         private void MakePcSleep()
         {
