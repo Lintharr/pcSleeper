@@ -208,6 +208,7 @@ namespace PCSleeper
             if (WakeUpChecker != null)
             {
                 Logger.LogWarning($@"{nameof(WakeUpChecker)} already exists!");
+                WakeUpCheckerStartTime = DateTime.UtcNow;
                 return;
             }
             Logger.LogInfo($@"Creating {nameof(WakeUpChecker)}.");
@@ -224,12 +225,12 @@ namespace PCSleeper
             Logger.LogInfo($@"{nameof(WakeUpChecker)} - PC idle time: {TimeHelper.ConvertTicksToTime(idleTime)}.");
             if ((DateTime.UtcNow - WakeUpCheckerStartTime) > WakeUpCheckerMaxLifespan)
             {
-                WakeUpCheckerStartTime = null;
-                DisposeOfWakeUpChecker();
+                NullifyWakeUpChecker(null, null); //delete it if user has been active longer than max lifespan
             }
 
             if (idleTime > GetTimeWithTolerance(WakeUpIdleTimeLimit))
             {
+                NullifyWakeUpChecker(null, null); //in case it wasn't already disposed of above
                 MakePcSleep();
             }
         }
