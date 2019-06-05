@@ -55,6 +55,11 @@ namespace PCSleeper
         private NotifyIcon TrayIcon;
 
         /// <summary>
+        /// Allows setup of a global keyboard shortcut to kill <see cref="WakeUpChecker"/>.
+        /// </summary>
+        private KeyboardHotKeyHook HotKeyHook { get; set; } = new KeyboardHotKeyHook();
+
+        /// <summary>
         /// This app may install itself onto the computer if ran with admin privileges and the user gives consent. It does so by registering a key in Windows Registry (regedit) and installing the executable in Program Files. It may then start whenever system is powered on.
         /// </summary>
         private string _appRegistryKeyName = "pcSleeper";
@@ -75,6 +80,7 @@ namespace PCSleeper
             InitializeTrayIcon();
             CreateSleeperChecker();
             AttachToWindowsWakeUpEvent(); //https://stackoverflow.com/questions/18206183/event-to-detect-system-wake-up-from-sleep-in-c-sharp
+            InitializeHotKeyHook();
         }
 
         #region Launch app stuff
@@ -116,13 +122,20 @@ namespace PCSleeper
                 Icon = new Icon(@"D:\Kyass\coding stuff\MyProjects\PCSleeper\PCSleeper\sleepIco.ico"),
                 ContextMenu = new ContextMenu(new MenuItem[]
                 {
-                    new MenuItem("Log info", ToggleLogger),
+                    new MenuItem("Break wake up timer", NullifyWakeUpChecker),
+                    new MenuItem("Toggle info logging", ToggleLogger),
                     new MenuItem("Exit/Kill", AppExit),
                 }),
                 Visible = true,
                 Text = "PcSleeper"
             };
             TrayIcon.ContextMenu.MenuItems[0].Checked = ConfigManager.EnableLogging;
+        }
+
+        private void NullifyWakeUpChecker(object sender, EventArgs e)
+        {
+            WakeUpCheckerStartTime = null;
+            DisposeOfWakeUpChecker();
         }
 
         private void ToggleLogger(object sender, EventArgs e)
@@ -223,6 +236,24 @@ namespace PCSleeper
 
         #endregion WakeUpChecker
 
+        #region HotKeyHook
+
+        private void InitializeHotKeyHook()
+        {
+            // register the event that is fired after the key press.
+            HotKeyHook.KeyPressed +=  new EventHandler<KeyPressedEventArgs>(Hook_KeyPressed);
+            // register the control + alt + K combination as hot key.
+            HotKeyHook.RegisterHotKey(ModifierKeys.Control | ModifierKeys.Alt, System.Windows.Forms.Keys.K); //TODO: Config.
+        }
+
+        private void Hook_KeyPressed(object sender, KeyPressedEventArgs e)
+        {
+            Logger.LogInfo("HotKeyHook used.");
+            NullifyWakeUpChecker(null, null);
+        }
+
+        #endregion HotKeyHook
+
         private uint GetTimeWithTolerance(uint timeLimit) => Convert.ToUInt32(timeLimit * (1 - GetTolerancePercent()));
 
         private double GetTolerancePercent() => 10 / 100; //TODO: move 10 to config
@@ -247,6 +278,8 @@ namespace PCSleeper
             SleepChecker.Close();
             SleepChecker = null;
             DisposeOfWakeUpChecker();
+            HotKeyHook.KeyPressed -=  new EventHandler<KeyPressedEventArgs>(Hook_KeyPressed);
+            HotKeyHook.Dispose();
             TrayIcon.Visible = false;
             base.Dispose();
         }
