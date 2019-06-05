@@ -127,9 +127,9 @@ namespace PCSleeper
                     new MenuItem("Exit/Kill", AppExit),
                 }),
                 Visible = true,
-                Text = "PcSleeper"
+                Text = "PcSleeper",
             };
-            TrayIcon.ContextMenu.MenuItems[0].Checked = ConfigManager.EnableLogging;
+            TrayIcon.ContextMenu.MenuItems[1].Checked = ConfigManager.EnableLogging;
         }
 
         private void NullifyWakeUpChecker(object sender, EventArgs e)
