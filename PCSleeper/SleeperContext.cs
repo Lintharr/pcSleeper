@@ -171,7 +171,7 @@ namespace PCSleeper
             //App has to target x86 for this gamepad checking thing to work, otherwise compiler throws runtime errors.
             GamePadState xboxControllerCurrentState = GamePad.GetState(PlayerIndex.One); // Get the current gamepad state. // Process input only if controller is connected.
             var idleTime = Win32_IdleHandler.GetIdleTime();
-            Logger.LogInfo($@"{nameof(SleepChecker)} - PC idle time: {TimeHelper.ConvertTicksToTime(idleTime)}. Is game pad connected: {xboxControllerCurrentState.IsConnected}.");
+            Logger.LogInfo($@"{nameof(SleepChecker)} - PC idle time: {TimeHelper.ConvertTicksToTime(idleTime)}.{(xboxControllerCurrentState.IsConnected ? " Game pad is connected!" : "")}");
             if (IsItNightTime() && !xboxControllerCurrentState.IsConnected && idleTime > GetTimeWithTolerance(NightIdleTimeLimit))
             {
                 MakePcSleep();
@@ -207,7 +207,7 @@ namespace PCSleeper
         {
             if (WakeUpChecker != null)
             {
-                Logger.LogWarning($@"{nameof(WakeUpChecker)} already exists!");
+                Logger.LogWarning($@"{nameof(WakeUpChecker)} already exists! Resetting timer.");
                 WakeUpCheckerStartTime = DateTime.UtcNow;
                 return;
             }
