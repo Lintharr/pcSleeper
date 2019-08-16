@@ -132,7 +132,11 @@ namespace PCSleeper
                 }),
                 Visible = true,
                 Text = "PcSleeper",
+                BalloonTipIcon = System.Windows.Forms.ToolTipIcon.Warning,
+                BalloonTipTitle = "PCSleeper",
+                BalloonTipText = "Pc will be sent to sleep in 1 minute. Click here to deactivate wake up timer.",
             };
+            TrayIcon.BalloonTipClicked += new EventHandler(WindowsNotificationClicked);
             TrayIcon.ContextMenu.MenuItems[1].Checked = ConfigManager.EnableLogging;
         }
 
@@ -155,6 +159,11 @@ namespace PCSleeper
             TrayIcon.Visible = false;
             Dispose();
             Application.Exit();
+        }
+
+        private void WindowsNotificationClicked(object sender, EventArgs e)
+        {
+            NullifyWakeUpChecker(sender, e);
         }
 
         #endregion Launch app stuff
@@ -227,6 +236,13 @@ namespace PCSleeper
         {
             var idleTime = Win32_IdleHandler.GetIdleTime();
             Logger.LogInfo($@"{nameof(WakeUpChecker)} - PC idle time: {TimeHelper.ConvertTicksToTime(idleTime)}.");
+
+            if (idleTime > TimeHelper.Minutes(1))
+            {
+                TrayIcon.ShowBalloonTip((int)TimeHelper.Seconds(8)); //Shows Windows notification
+                Logger.LogInfo("Displayed Windows notification.");
+            }
+
             if ((DateTime.UtcNow - WakeUpCheckerStartTime) > WakeUpCheckerMaxLifespan)
             {
                 NullifyWakeUpChecker(null, null); //delete it if user has been active longer than max lifespan
@@ -285,7 +301,9 @@ namespace PCSleeper
             DisposeOfWakeUpChecker();
             HotKeyHook.KeyPressed -= new EventHandler<KeyPressedEventArgs>(Hook_KeyPressed);
             HotKeyHook.Dispose();
+            TrayIcon.BalloonTipClicked -= new EventHandler(WindowsNotificationClicked);
             TrayIcon.Visible = false;
+            TrayIcon.Dispose();
             base.Dispose();
         }
 
