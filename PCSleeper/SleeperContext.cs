@@ -47,7 +47,7 @@ namespace PCSleeper
 
         private uint CheckIntervalOfWakeUpChecker = TimeHelper.Minutes(1);
         private uint WakeUpIdleTimeLimit = TimeHelper.Minutes(2);
-        private TimeSpan WakeUpCheckerMaxLifespan = new TimeSpan(0, 15, 0);
+        private TimeSpan WakeUpCheckerMaxLifespan = new TimeSpan(0, 10, 0);
 
         /// <summary>
         /// This app features a windows tray icon to allow for simpler closing/killing of the app.
@@ -238,7 +238,7 @@ namespace PCSleeper
             var idleTime = Win32_IdleHandler.GetIdleTime();
             Logger.LogInfo($@"{nameof(WakeUpChecker)} - PC idle time: {TimeHelper.ConvertTicksToTime(idleTime)}.");
 
-            if (idleTime > TimeHelper.Minutes(1))
+            if (idleTime > TimeHelper.Seconds(50))
             {
                 TrayIcon.ShowBalloonTip((int)TimeHelper.Seconds(8)); //Shows Windows notification
                 Logger.LogInfo("Displayed Windows notification.");
@@ -249,7 +249,7 @@ namespace PCSleeper
                 NullifyWakeUpChecker(null, null); //delete it if user has been active longer than max lifespan
             }
 
-            if (idleTime > GetTimeWithTolerance(WakeUpIdleTimeLimit))
+            if (idleTime > WakeUpIdleTimeLimit)
             {
                 NullifyWakeUpChecker(null, null); //in case it wasn't already disposed of above
                 MakePcSleep();

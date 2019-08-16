@@ -85,7 +85,7 @@ namespace PCSleeper
                 throw new InvalidOperationException("Couldn’t register the hot key.");
             }
             else
-                Logger.LogInfo($"Hotkeys registered. Modifier: {modifier}, Key: {key}.");
+                Logger.LogInfo($"Hotkeys registered. Modifier: {modifier}. Key: {key}.");
         }
 
         /// <summary>
