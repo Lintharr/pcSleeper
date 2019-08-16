@@ -80,7 +80,12 @@ namespace PCSleeper
 
             // register the hot key.
             if (!RegisterHotKey(_window.Handle, _currentId, (uint)modifier, (uint)key))
+            {
+                Logger.LogInfo($"Unable to register hotkeys.");
                 throw new InvalidOperationException("Couldn’t register the hot key.");
+            }
+            else
+                Logger.LogInfo($"Hotkeys registered. Modifier: {modifier}, Key: {key}.");
         }
 
         /// <summary>
@@ -95,6 +100,8 @@ namespace PCSleeper
             {
                 UnregisterHotKey(_window.Handle, i);
             }
+
+            Logger.LogInfo($"Hotkeys unregistered.");
 
             // dispose the inner native window.
             _window.Dispose();

@@ -59,6 +59,10 @@ namespace PCSleeper
         /// </summary>
         private KeyboardHotKeyHook HotKeyHook { get; set; } = new KeyboardHotKeyHook();
 
+        private ModifierKeys HotkeyModifier = ModifierKeys.Control | ModifierKeys.Alt;
+
+        private System.Windows.Forms.Keys HotkeyKey = System.Windows.Forms.Keys.K;
+
         /// <summary>
         /// This app may install itself onto the computer if ran with admin privileges and the user gives consent. It does so by registering a key in Windows Registry (regedit) and installing the executable in Program Files. It may then start whenever system is powered on.
         /// </summary>
@@ -122,7 +126,7 @@ namespace PCSleeper
                 Icon = new Icon(@"D:\Kyass\coding stuff\MyProjects\PCSleeper\PCSleeper\sleepIco.ico"),
                 ContextMenu = new ContextMenu(new MenuItem[]
                 {
-                    new MenuItem("Break wake up timer", NullifyWakeUpChecker),
+                    new MenuItem($"Break wake up timer ({HotkeyModifier} + {HotkeyKey})", NullifyWakeUpChecker),
                     new MenuItem("Toggle info logging", ToggleLogger),
                     new MenuItem("Exit/Kill", AppExit),
                 }),
@@ -242,14 +246,14 @@ namespace PCSleeper
         private void InitializeHotKeyHook()
         {
             // register the event that is fired after the key press.
-            HotKeyHook.KeyPressed +=  new EventHandler<KeyPressedEventArgs>(Hook_KeyPressed);
+            HotKeyHook.KeyPressed += new EventHandler<KeyPressedEventArgs>(Hook_KeyPressed);
             // register the control + alt + K combination as hot key.
-            HotKeyHook.RegisterHotKey(ModifierKeys.Control | ModifierKeys.Alt, System.Windows.Forms.Keys.K); //TODO: Config.
+            HotKeyHook.RegisterHotKey(HotkeyModifier, HotkeyKey); //TODO: Config.
         }
 
         private void Hook_KeyPressed(object sender, KeyPressedEventArgs e)
         {
-            Logger.LogInfo("HotKeyHook used.");
+            Logger.LogInfo($"HotKeyHook used. Nullifying {nameof(WakeUpChecker)}.");
             NullifyWakeUpChecker(null, null);
         }
 
@@ -279,7 +283,7 @@ namespace PCSleeper
             SleepChecker.Close();
             SleepChecker = null;
             DisposeOfWakeUpChecker();
-            HotKeyHook.KeyPressed -=  new EventHandler<KeyPressedEventArgs>(Hook_KeyPressed);
+            HotKeyHook.KeyPressed -= new EventHandler<KeyPressedEventArgs>(Hook_KeyPressed);
             HotKeyHook.Dispose();
             TrayIcon.Visible = false;
             base.Dispose();
