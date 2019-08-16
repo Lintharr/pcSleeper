@@ -230,6 +230,7 @@ namespace PCSleeper
             WakeUpChecker.Interval = CheckIntervalOfWakeUpChecker;
             WakeUpCheckerStartTime = DateTime.UtcNow;
             WakeUpChecker.Enabled = true;
+            ChangeTrayIcon(true);
         }
 
         private void OnTimedWakeUpEvent(object source, ElapsedEventArgs e)
@@ -291,6 +292,12 @@ namespace PCSleeper
             }
         }
 
+        private void ChangeTrayIcon(bool changeToActive)
+        {
+            Logger.LogInfo($@"Changing icon to {(changeToActive ? "Active" : "Default")}.");
+            TrayIcon.Icon = new Icon($@"D:\Kyass\coding stuff\MyProjects\PCSleeper\PCSleeper\sleepIco{(changeToActive ? "Active" : "")}.ico");
+        }
+
         public new void Dispose()
         {
             Logger.LogInfo("App closing.");
@@ -314,6 +321,7 @@ namespace PCSleeper
                 WakeUpChecker.Elapsed -= new ElapsedEventHandler(OnTimedWakeUpEvent);
                 WakeUpChecker.Close();
                 WakeUpChecker = null;
+                ChangeTrayIcon(false);
                 Logger.LogInfo($@"Disposed of {nameof(WakeUpChecker)}.");
             }
         }
