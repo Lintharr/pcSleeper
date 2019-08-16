@@ -277,7 +277,7 @@ namespace PCSleeper
 
         private uint GetTimeWithTolerance(uint timeLimit) => Convert.ToUInt32(timeLimit * (1 - GetTolerancePercent()));
 
-        private double GetTolerancePercent() => 10 / 100; //TODO: move 10 to config
+        private double GetTolerancePercent() => 10f / 100; //TODO: move 10 to config
 
         private void MakePcSleep()
         {
