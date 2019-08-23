@@ -246,6 +246,7 @@ namespace PCSleeper
 
             if ((DateTime.UtcNow - WakeUpCheckerStartTime) > WakeUpCheckerMaxLifespan)
             {
+                Logger.LogInfo($@"{nameof(WakeUpChecker)} managed to stay up through its lifespan. Disposing...");
                 NullifyWakeUpChecker(null, null); //delete it if user has been active longer than max lifespan
             }
 
