@@ -134,7 +134,7 @@ namespace PCSleeper
                 Text = "PcSleeper",
                 BalloonTipIcon = System.Windows.Forms.ToolTipIcon.Warning,
                 BalloonTipTitle = "PCSleeper",
-                BalloonTipText = "Pc will be sent to sleep in 1 minute. Click here to deactivate wake up timer.",
+                BalloonTipText = $@"Pc will be sent to sleep in 1 minute. Click here to deactivate wake up timer. (Or use hotkey: {HotkeyModifier} + {HotkeyKey})",
             };
             TrayIcon.BalloonTipClicked += new EventHandler(WindowsNotificationClicked);
             TrayIcon.ContextMenu.MenuItems[1].Checked = ConfigManager.EnableLogging;
