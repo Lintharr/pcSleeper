@@ -7,6 +7,8 @@ namespace PCSleeper
     //https://stackoverflow.com/questions/2450373/set-global-hotkeys-using-c-sharp
     public sealed class KeyboardHotKeyHook : IDisposable
     {
+        #region WinImport
+
         // Registers a hot key with Windows.
         [DllImport("user32.dll")]
         private static extern bool RegisterHotKey(IntPtr hWnd, int id, uint fsModifiers, uint vk);
@@ -56,8 +58,15 @@ namespace PCSleeper
             }
         }
 
+        #endregion WinImport
+
         private InvokingWindow _window = new InvokingWindow();
         private int _currentId;
+
+        /// <summary>
+        /// A hot key has been pressed.
+        /// </summary>
+        public event EventHandler<KeyPressedEventArgs> KeyPressed;
 
         public KeyboardHotKeyHook()
         {
@@ -85,13 +94,10 @@ namespace PCSleeper
                 throw new InvalidOperationException("Couldn’t register the hot key.");
             }
             else
+            {
                 Logger.LogInfo($"Hotkeys registered. Modifier: {modifier}. Key: {key}.");
+            }
         }
-
-        /// <summary>
-        /// A hot key has been pressed.
-        /// </summary>
-        public event EventHandler<KeyPressedEventArgs> KeyPressed;
 
         public void Dispose()
         {
@@ -116,14 +122,14 @@ namespace PCSleeper
         private ModifierKeys _modifier;
         private Keys _key;
 
+        public ModifierKeys Modifier => _modifier;
+        public Keys Key => _key;
+
         internal KeyPressedEventArgs(ModifierKeys modifier, Keys key)
         {
             _modifier = modifier;
             _key = key;
         }
-
-        public ModifierKeys Modifier => _modifier;
-        public Keys Key => _key;
     }
 
     /// <summary>

@@ -59,5 +59,35 @@ namespace PCSleeper.Properties {
                 resourceCulture = value;
             }
         }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Icon similar to (Icon).
+        /// </summary>
+        internal static System.Drawing.Icon sleepIco {
+            get {
+                object obj = ResourceManager.GetObject("sleepIco", resourceCulture);
+                return ((System.Drawing.Icon)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Icon similar to (Icon).
+        /// </summary>
+        internal static System.Drawing.Icon sleepIcoActive {
+            get {
+                object obj = ResourceManager.GetObject("sleepIcoActive", resourceCulture);
+                return ((System.Drawing.Icon)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Icon similar to (Icon).
+        /// </summary>
+        internal static System.Drawing.Icon sleepIcoActiveAlt {
+            get {
+                object obj = ResourceManager.GetObject("sleepIcoActiveAlt", resourceCulture);
+                return ((System.Drawing.Icon)(obj));
+            }
+        }
     }
 }
